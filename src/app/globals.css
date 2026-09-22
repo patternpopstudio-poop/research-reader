@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cream: #f4efe4;
+  --paper: #fbf7ef;
+  --ink: #1f2a1c;
+  --ink-muted: #5c6758;
+  --green: #3d6b3a;
+  --green-dark: #2f542d;
+  --line: #ddd4c4;
+  --background: var(--cream);
+  --foreground: var(--ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-source-sans);
+  --font-serif: var(--font-source-serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.font-serif {
+  font-family: var(--font-serif), Georgia, serif;
+}
+
+.select-none,
+.select-none * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.watermark-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: space-around;
+  justify-content: space-around;
+  gap: 4rem;
+  overflow: hidden;
+  opacity: 0.14;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-24deg) scale(1.4);
+  color: #1f2a1c;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  body::after {
+    content: "Printing is not permitted.";
+    visibility: visible;
+    position: fixed;
+    inset: 40% 0 auto;
+    text-align: center;
+    font-size: 1.25rem;
+  }
 }
