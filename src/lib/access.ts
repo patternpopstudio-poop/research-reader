@@ -37,15 +37,19 @@ export async function linkGrantsToUser(userId: string, email: string) {
     .is("user_id", null);
 }
 
+export function configuredAdminEmails() {
+  return (process.env.ADMIN_EMAIL ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter((email) => email.includes("@"));
+}
+
 export function configuredAdminEmail() {
-  const value = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (!value || !value.includes("@")) return null;
-  return value;
+  return configuredAdminEmails()[0] ?? null;
 }
 
 export function isConfiguredAdminEmail(email: string) {
-  const adminEmail = configuredAdminEmail();
-  return Boolean(adminEmail && normalizeEmail(email) === adminEmail);
+  return configuredAdminEmails().includes(normalizeEmail(email));
 }
 
 async function promoteConfiguredAdmin(userId: string, email: string) {
