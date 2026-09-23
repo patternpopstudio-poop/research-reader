@@ -12,7 +12,7 @@ Clinic site: [prathibareddythodima.com](https://prathibareddythodima.com/) (Rese
    cp .env.example .env.local
    ```
 
-   Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from the Supabase project **Settings → API**. Set `NEXT_PUBLIC_SITE_URL=http://localhost:3000`. For paid access, add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Optional `STRIPE_PRICE_ID` uses a Stripe Price in subscription mode; otherwise Checkout bills `billing_settings` as a one-time amount.
+   Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from the Supabase project **Settings → API**. Set `NEXT_PUBLIC_SITE_URL=http://localhost:3000`. For paid access, add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Optional `STRIPE_PRICE_ID` uses a Stripe Price in subscription mode; otherwise Checkout bills `billing_settings` as a one-time amount. For the purchase confirmation email, add `RESEND_API_KEY` and `RESEND_FROM` (a verified Resend sender).
 
 2. In the Supabase dashboard:
 
@@ -20,7 +20,7 @@ Clinic site: [prathibareddythodima.com](https://prathibareddythodima.com/) (Rese
    - **Authentication → URL configuration**:
      - Site URL: `http://localhost:3000` (switch to the production domain later)
      - Redirect URLs: `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/callback**`, and the same paths on the production host.
-   - **SQL Editor**: paste and run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql), then [`supabase/migrations/002_portal_foundation.sql`](supabase/migrations/002_portal_foundation.sql). The first creates `profiles`, `papers`, `invites`, RLS, the private `papers` bucket, and the 10 clinic paper rows. The second adds portal copy fields, `access_grants`, `billing_settings`, and a public `covers` bucket.
+   - **SQL Editor**: paste and run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql), then [`supabase/migrations/002_portal_foundation.sql`](supabase/migrations/002_portal_foundation.sql), then [`supabase/migrations/003_confirmation_email.sql`](supabase/migrations/003_confirmation_email.sql). The first creates `profiles`, `papers`, `invites`, RLS, the private `papers` bucket, and the 10 clinic paper rows. The second adds portal copy fields, `access_grants`, `billing_settings`, and a public `covers` bucket. The third records which checkout session already received a confirmation email.
 
 3. Create your admin user:
 
@@ -62,7 +62,7 @@ Unauthenticated visitors stay on the paper portal. Only `/papers` (library index
 
 An invite with `paper_id` null grants every published paper and also writes a library `access_grants` row. A specific `paper_id` still grants only that paper via `invites`. A grant (invite or purchase) unlocks the whole published library until `expires_at`. Admins bypass both checks.
 
-Set price, duration, and portal copy in **Admin**. Covers are optional. Stripe Checkout is the paid path: the webhook (`/api/stripe/webhook`) is the source of truth for grants. Point Stripe at that URL (local: `stripe listen --forward-to localhost:3000/api/stripe/webhook`). The success page only displays status; it does not write access. After pay, a magic link is sent to the checkout email. The branded confirmation email is still a later step.
+Set price, duration, support email, and portal copy in **Admin**. Covers are optional. Stripe Checkout is the paid path: the webhook (`/api/stripe/webhook`) is the source of truth for grants. Point Stripe at that URL (local: `stripe listen --forward-to localhost:3000/api/stripe/webhook`). The success page only displays status; it does not write access. After pay, the webhook sends a magic link and a confirmation email (**Your Research Access is Confirmed**) whose button opens `/login?next=/papers/[slug]/read`. A replay of the same checkout session does not send that confirmation again.
 
 ## Clinic site URL mapping
 
@@ -86,15 +86,15 @@ Until those hrefs change, this app is only reachable by URL (public portal; read
 ## Deploy on Vercel
 
 1. Push this repo and import it in Vercel.
-2. Add the same env vars. Set `NEXT_PUBLIC_SITE_URL=https://research.prathibareddythodima.com`.
+2. Add the same env vars, including `RESEND_API_KEY` and `RESEND_FROM`. Set `NEXT_PUBLIC_SITE_URL=https://research.prathibareddythodima.com`.
 3. Add the domain `research.prathibareddythodima.com` in Vercel, then create a DNS CNAME (or A) at your domain registrar pointing at Vercel.
 4. Update Supabase Auth Site URL and Redirect URLs to the production origin (`https://research.prathibareddythodima.com/auth/callback`).
 5. In Stripe, add a webhook for `checkout.session.completed` and `checkout.session.async_payment_succeeded` to `https://research.prathibareddythodima.com/api/stripe/webhook`, then put the signing secret in `STRIPE_WEBHOOK_SECRET`.
-6. Smoke-test: uninvited email gets the generic “if invited…” message and no mail; invited email opens the viewer; test-mode purchase writes a grant (replay the webhook once — still one row); Network tab shows `/api/papers/.../file`, not a public Storage URL; print is blanked; canvas text cannot be copied.
+6. Smoke-test: uninvited email gets the generic “if invited…” message and no mail; invited email opens the viewer; test-mode purchase writes a grant, sends **Your Research Access is Confirmed**, and a replay of that webhook does not send a second confirmation; Network tab shows `/api/papers/.../file`, not a public Storage URL; print is blanked; canvas text cannot be copied.
 
 ## Protections (and limits)
 
-Implemented: private bucket, server-side PDF proxy, `Cache-Control: no-store`, frame deny, no text layer, watermark with the reader’s email, blocked context menu / copy / save / print shortcuts, overlay when the tab is hidden.
+Implemented: private bucket, server-side PDF proxy with no download filename, `Cache-Control: no-store`, frame deny, no text layer, one page at a time with previous/next and full screen, watermark with the reader’s email, access ID, and practice name, blocked context menu / copy / save / print shortcuts, overlay when the tab is hidden.
 
 Not possible in a browser: blocking OS screenshots, phone photos, or a determined user with developer tools. Treat this as access control plus attribution.
 

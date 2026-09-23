@@ -110,7 +110,10 @@ export async function uploadPaper(_prev: { message: string }, formData: FormData
 
   if (updateError) return { message: updateError.message };
 
+  revalidatePath("/");
+  revalidatePath("/papers");
   revalidatePath("/admin");
+  revalidatePath("/upload");
   revalidatePath(`/papers/${paper.slug}`);
   revalidatePath(`/papers/${paper.slug}/read`);
   return { message: `Uploaded ${path}.` };

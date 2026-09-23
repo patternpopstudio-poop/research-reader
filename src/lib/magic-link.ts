@@ -33,7 +33,13 @@ export async function sendAccessLink(email: string, nextPath: string, options?: 
   });
 
   if (error) {
-    return { ok: false as const, message: "Could not send the link. Try again in a moment." };
+    const limited = error.status === 429 || error.code === "over_email_send_rate_limit";
+    return {
+      ok: false as const,
+      message: limited
+        ? "Too many sign-in emails were just sent. Wait a minute, then request the link once."
+        : "Could not send the link. Try again in a moment.",
+    };
   }
 
   return { ok: true as const, skipped: false as const };

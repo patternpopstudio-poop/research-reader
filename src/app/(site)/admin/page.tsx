@@ -22,7 +22,7 @@ export default async function AdminPage() {
   const { data: grants } = await admin
     .from("access_grants")
     .select(
-      "id, email, user_id, source, starts_at, expires_at, stripe_customer_id, stripe_checkout_session_id, access_id, created_at",
+      "id, email, user_id, source, starts_at, expires_at, stripe_customer_id, stripe_checkout_session_id, confirmation_session_id, access_id, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(50);
@@ -46,8 +46,8 @@ export default async function AdminPage() {
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
           <h2 className="font-serif text-xl">Invite a reader</h2>
           <p className="mt-1 mb-4 text-sm text-[var(--ink-muted)]">
-            They still request a magic link on the login page. An all-papers invite also writes a
-            library grant.
+            They sign in with that email and a password. The first sign-in sets the password. An
+            all-papers invite also writes a library grant.
           </p>
           <InviteForm papers={paperList} />
         </section>

@@ -34,12 +34,14 @@ export async function proxy(request: NextRequest) {
   const isPublicPaperPortal = paperSegments.length === 2 && paperSegments[0] === "papers";
   const isPublicUnlocked =
     paperSegments.length === 3 && paperSegments[0] === "papers" && paperSegments[2] === "unlocked";
+  const isPapersIndex = pathname === "/papers";
   const isProtected =
     !isPublicPaperPortal &&
     !isPublicUnlocked &&
-    (pathname === "/papers" ||
-      pathname.startsWith("/papers/") ||
+    !isPapersIndex &&
+    (pathname.startsWith("/papers/") ||
       pathname.startsWith("/admin") ||
+      pathname.startsWith("/upload") ||
       pathname.startsWith("/api/papers"));
 
   if (!user && isProtected) {
@@ -49,10 +51,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && (pathname === "/login" || pathname === "/")) {
-    const next = request.nextUrl.searchParams.get("next") || "/papers";
+  if (user && pathname === "/login") {
+    const next = request.nextUrl.searchParams.get("next") || "/";
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = next.startsWith("/") ? next : "/papers";
+    redirectUrl.pathname = next.startsWith("/") ? next : "/";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
@@ -61,5 +63,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/papers/:path*", "/admin/:path*", "/api/papers/:path*"],
+  matcher: ["/", "/login", "/papers/:path*", "/admin/:path*", "/upload", "/api/papers/:path*"],
 };

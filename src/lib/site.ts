@@ -5,7 +5,7 @@ export function getSiteOrigin() {
   return "http://localhost:3000";
 }
 
-export function safeNextPath(path: string | null | undefined, fallback = "/papers") {
+export function safeNextPath(path: string | null | undefined, fallback = "/") {
   if (path && path.startsWith("/")) return path;
   return fallback;
 }

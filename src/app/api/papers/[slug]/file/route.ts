@@ -6,7 +6,13 @@ import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ slug: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
+  const destination = request.headers.get("sec-fetch-dest");
+  const fromReader = request.headers.get("x-reader") === "1" && destination !== "document" && destination !== "iframe";
+  if (!fromReader) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
   const { slug } = await params;
   const user = await getSessionUser();
 
@@ -45,11 +51,11 @@ export async function GET(_request: Request, { params }: Params) {
   return new NextResponse(Buffer.from(buffer), {
     status: 200,
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${typed.slug}.pdf"`,
+      "Content-Type": "application/octet-stream",
       "Cache-Control": "private, no-store, no-cache, must-revalidate",
       Pragma: "no-cache",
       "X-Content-Type-Options": "nosniff",
+      "X-Download-Options": "noopen",
       "X-Robots-Tag": "noindex, nofollow",
     },
   });

@@ -1,5 +1,6 @@
-import { canReadPaper, getSessionUser, isAdmin } from "@/lib/access";
+import { canReadPaper, getActiveGrant, getBillingSettings, getSessionUser, isAdmin } from "@/lib/access";
 import { getPaperBySlug } from "@/lib/papers";
+import { formatLicenseWatermark } from "@/lib/watermark";
 import { PdfViewer } from "@/components/PdfViewer";
 import type { Paper } from "@/lib/types";
 import type { Metadata } from "next";
@@ -31,8 +32,15 @@ export default async function PaperReadPage({ params }: Props) {
   const allowed = await canReadPaper(paper as Paper, user.email);
   if (!allowed) redirect(`/papers/${slug}?access=none`);
 
+  const [grant, billing] = await Promise.all([getActiveGrant(user.email), getBillingSettings()]);
+  const watermark = formatLicenseWatermark({
+    email: user.email,
+    accessId: grant?.access_id ?? null,
+    companyName: billing?.company_name,
+  });
+
   return (
-    <div>
+    <div className="flex flex-1 flex-col">
       <div className="flex items-center justify-between gap-4 px-4 py-2 text-xs text-[var(--ink-muted)]">
         <Link href="/papers" className="hover:underline">
           ← Back to Research Library
@@ -41,7 +49,7 @@ export default async function PaperReadPage({ params }: Props) {
           Paper details
         </Link>
       </div>
-      <PdfViewer slug={paper.slug} title={paper.title} watermark={user.email} />
+      <PdfViewer slug={paper.slug} title={paper.title} watermark={watermark} />
     </div>
   );
 }

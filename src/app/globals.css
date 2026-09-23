@@ -26,6 +26,18 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+.site-shell {
+  --cream: #f4f6f9;
+  --paper: #ffffff;
+  --ink: #1b2430;
+  --ink-muted: #667085;
+  --green: #5b7a12;
+  --green-dark: #49630b;
+  --line: #e6ebf2;
+  background: var(--cream);
+  color: var(--ink);
+}
+
 .font-serif {
   font-family: var(--font-serif), Georgia, serif;
 }
@@ -34,6 +46,11 @@ body {
 .select-none * {
   user-select: none !important;
   -webkit-user-select: none !important;
+}
+
+.viewer-shell:fullscreen {
+  overflow: auto;
+  background: var(--cream);
 }
 
 .watermark-layer {
@@ -48,12 +65,16 @@ body {
   overflow: hidden;
   opacity: 0.14;
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   transform: rotate(-24deg) scale(1.4);
   color: #1f2a1c;
-  white-space: pre-wrap;
-  word-break: break-all;
+}
+
+.watermark-layer span {
+  max-width: 16rem;
+  text-align: center;
+  line-height: 1.45;
 }
 
 @media print {

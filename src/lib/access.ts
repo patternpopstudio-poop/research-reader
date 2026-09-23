@@ -37,9 +37,34 @@ export async function linkGrantsToUser(userId: string, email: string) {
     .is("user_id", null);
 }
 
+export function configuredAdminEmail() {
+  const value = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (!value || !value.includes("@")) return null;
+  return value;
+}
+
+export function isConfiguredAdminEmail(email: string) {
+  const adminEmail = configuredAdminEmail();
+  return Boolean(adminEmail && normalizeEmail(email) === adminEmail);
+}
+
+async function promoteConfiguredAdmin(userId: string, email: string) {
+  const admin = tryCreateAdminClient();
+  if (!admin) return;
+  await admin.from("profiles").upsert(
+    { id: userId, email: normalizeEmail(email), role: "admin" },
+    { onConflict: "id" },
+  );
+}
+
 export async function isAdmin() {
   const profile = await getProfile();
-  return profile?.role === "admin";
+  if (profile?.role === "admin") return true;
+
+  const user = await getSessionUser();
+  if (!user?.email || !isConfiguredAdminEmail(user.email)) return false;
+  await promoteConfiguredAdmin(user.id, user.email);
+  return true;
 }
 
 export function normalizeEmail(email: string) {
@@ -77,7 +102,7 @@ export async function getActiveGrant(email: string): Promise<AccessGrant | null>
   const { data, error } = await admin
     .from("access_grants")
     .select(
-      "id, email, user_id, source, starts_at, expires_at, stripe_customer_id, stripe_checkout_session_id, access_id, created_at",
+      "id, email, user_id, source, starts_at, expires_at, stripe_customer_id, stripe_checkout_session_id, confirmation_session_id, access_id, created_at",
     )
     .ilike("email", normalizeEmail(email));
 
@@ -93,6 +118,7 @@ export async function getActiveGrant(email: string): Promise<AccessGrant | null>
 }
 
 export async function emailHasAccess(email: string, paperId?: string | null) {
+  if (isConfiguredAdminEmail(email)) return true;
   if (await getActiveGrant(email)) return true;
   return emailIsInvited(email, paperId);
 }
@@ -103,27 +129,27 @@ export async function canReadPaper(paper: Paper, email: string | undefined) {
   return emailHasAccess(email, paper.id);
 }
 
+export async function listPublishedPapers() {
+  const admin = tryCreateAdminClient();
+  if (!admin) return [];
+  const { data } = await admin.from("papers").select(PAPER_SELECT).eq("published", true).order("title");
+  return (data as Paper[] | null) ?? [];
+}
+
 export async function listAccessiblePapers() {
   const user = await getSessionUser();
   if (!user?.email) return [];
 
-  const admin = tryCreateAdminClient();
-  if (!admin) return [];
-  const { data: papers } = await admin
-    .from("papers")
-    .select(PAPER_SELECT)
-    .eq("published", true)
-    .order("title");
-
-  if (!papers) return [];
+  const papers = await listPublishedPapers();
+  if (papers.length === 0) return [];
 
   const adminUser = await isAdmin();
-  if (adminUser) return papers as Paper[];
+  if (adminUser) return papers;
 
-  if (await getActiveGrant(user.email)) return papers as Paper[];
+  if (await getActiveGrant(user.email)) return papers;
 
   const allowed: Paper[] = [];
-  for (const paper of papers as Paper[]) {
+  for (const paper of papers) {
     if (await emailIsInvited(user.email, paper.id)) allowed.push(paper);
   }
   return allowed;

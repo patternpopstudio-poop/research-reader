@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import {
   createInvite,
   updateBilling,
@@ -8,6 +8,7 @@ import {
   uploadCover,
   uploadPaper,
 } from "@/app/admin/actions";
+import { PAPER_TOPIC_NAMES, paperTopic } from "@/lib/paper-presentation";
 import type { BillingSettings, Paper } from "@/lib/types";
 
 const empty = { message: "" };
@@ -54,31 +55,178 @@ export function InviteForm({ papers }: { papers: Paper[] }) {
   );
 }
 
-export function UploadForm({ papers }: { papers: Paper[] }) {
+type UploadPaper = {
+  id: string;
+  title: string;
+  slug?: string;
+  topic?: string;
+  storage_path: string | null;
+};
+
+export function AdminPdfUpload({ papers }: { papers: UploadPaper[] }) {
+  return (
+    <section className="mt-5 rounded-2xl border border-[var(--line)] bg-white p-4 lg:mt-0">
+      <h2 className="text-sm font-semibold text-[var(--ink)]">Upload a PDF</h2>
+      <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
+        Choose the document, then a PDF from your computer.
+      </p>
+      <div className="mt-3">
+        <UploadForm papers={papers} compact />
+      </div>
+    </section>
+  );
+}
+
+export function UploadForm({ papers, compact = false }: { papers: UploadPaper[]; compact?: boolean }) {
   const [state, action, pending] = useActionState(uploadPaper, empty);
+  const [fileLabel, setFileLabel] = useState<string | null>(null);
+  const [hint, setHint] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const grouped = useMemo(() => papers.map((paper) => ({ ...paper, topic: paper.topic || paperTopic(paper.slug ?? "") })), [papers]);
+  const topics = useMemo(() => topicOrder(grouped.map((paper) => paper.topic)), [grouped]);
+  const [topic, setTopic] = useState(topics[0] ?? "");
+  const inTopic = grouped.filter((paper) => paper.topic === topic);
+  const [paperId, setPaperId] = useState(inTopic[0]?.id ?? "");
+
+  function rememberFile(file: File | undefined) {
+    if (!file) {
+      setFileLabel(null);
+      return;
+    }
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setHint("Choose a PDF file.");
+      setFileLabel(null);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setHint("");
+    setFileLabel(`${file.name} · ${formatFileSize(file.size)}`);
+  }
 
   return (
-    <form action={action} className="flex flex-col gap-3">
-      <select name="paper_id" required className="rounded-lg border border-[var(--line)] bg-white px-3 py-2">
-        <option value="">Select paper</option>
-        {papers.map((paper) => (
-          <option key={paper.id} value={paper.id}>
-            {paper.title}
-            {paper.storage_path ? " (has PDF)" : ""}
-          </option>
-        ))}
-      </select>
-      <input name="file" type="file" accept="application/pdf" required className="text-sm" />
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full bg-[var(--green)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {pending ? "Uploading…" : "Upload PDF"}
-      </button>
+    <form
+      action={action}
+      className={compact ? "flex flex-col gap-3" : "flex flex-col gap-4"}
+      onSubmit={(event) => {
+        if (!fileRef.current?.files?.length) {
+          event.preventDefault();
+          setHint("Choose a PDF from your computer first.");
+        }
+      }}
+    >
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--ink)]">Topic</span>
+        <select
+          value={topic}
+          onChange={(event) => {
+            const next = event.target.value;
+            setTopic(next);
+            const first = grouped.find((paper) => paper.topic === next);
+            setPaperId(first?.id ?? "");
+          }}
+          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-[var(--ink)] outline-none ring-[var(--green)] focus:ring-2"
+        >
+          {topics.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--ink)]">Papers in {topic || "this topic"}</span>
+        <select
+          name="paper_id"
+          required
+          value={paperId}
+          onChange={(event) => setPaperId(event.target.value)}
+          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-[var(--ink)] outline-none ring-[var(--green)] focus:ring-2"
+        >
+          {inTopic.map((paper) => (
+            <option key={paper.id} value={paper.id}>
+              {paper.title}
+              {paper.storage_path ? " · PDF already uploaded" : " · no PDF yet"}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-[var(--ink-muted)]">
+          This is the same {topic || "topic"} list as the library. The uploaded PDF appears with these papers.
+        </span>
+      </label>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--ink)]">PDF file</span>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            const file = event.dataTransfer.files[0];
+            if (!file || !fileRef.current) return;
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            fileRef.current.files = transfer.files;
+            rememberFile(file);
+          }}
+          className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--green)] bg-[#f7faf2] px-4 text-center transition hover:bg-[#f0f5e4] ${compact ? "min-h-20 py-4" : "min-h-44 py-10"}`}
+        >
+          <span className="font-medium text-[var(--ink)]">
+            {fileLabel ?? "Choose a PDF from your computer"}
+          </span>
+          <span className="mt-1 text-xs text-[var(--ink-muted)]">
+            {fileLabel ? "Click to choose a different file, or drop one here" : "Click here to open your files, or drop a PDF here"}
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          name="file"
+          type="file"
+          accept="application/pdf,.pdf"
+          className="sr-only"
+          onChange={(event) => rememberFile(event.currentTarget.files?.[0])}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending || !fileLabel}
+          className="rounded-full bg-[var(--green)] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--green-dark)] disabled:opacity-50"
+        >
+          {pending ? "Uploading…" : "Upload to library"}
+        </button>
+        {fileLabel ? (
+          <button
+            type="button"
+            className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink)]"
+            onClick={() => {
+              if (fileRef.current) fileRef.current.value = "";
+              setFileLabel(null);
+              setHint("");
+            }}
+          >
+            Clear file
+          </button>
+        ) : null}
+      </div>
+      {hint ? <p className="text-sm text-red-800">{hint}</p> : null}
       {state.message ? <p className="text-sm text-[var(--ink-muted)]">{state.message}</p> : null}
     </form>
   );
+}
+
+function topicOrder(names: string[]) {
+  const present = new Set(names.filter(Boolean));
+  const known = PAPER_TOPIC_NAMES.filter((name) => present.has(name));
+  const extra = [...present].filter((name) => !PAPER_TOPIC_NAMES.includes(name)).sort((a, b) => a.localeCompare(b));
+  return [...known, ...extra];
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function CoverForm({ papers }: { papers: Paper[] }) {

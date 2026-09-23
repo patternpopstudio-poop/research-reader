@@ -33,6 +33,7 @@ export type AccessGrant = {
   expires_at: string | null;
   stripe_customer_id: string | null;
   stripe_checkout_session_id: string | null;
+  confirmation_session_id: string | null;
   access_id: string;
   created_at: string;
 };
