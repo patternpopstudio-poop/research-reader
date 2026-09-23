@@ -1,7 +1,9 @@
-import { canReadPaper, getActiveGrant, getBillingSettings, getSessionUser, isAdmin } from "@/lib/access";
+import { DocumentLimitScreen } from "@/components/LimitReachedModal";
+import { PdfViewer } from "@/components/PdfViewer";
+import { getActiveGrant, getBillingSettings, getSessionUser, isAdmin } from "@/lib/access";
+import { FREE_PAGE_LIMIT, openReaderAccess } from "@/lib/free-access";
 import { getPaperBySlug } from "@/lib/papers";
 import { formatLicenseWatermark } from "@/lib/watermark";
-import { PdfViewer } from "@/components/PdfViewer";
 import type { Paper } from "@/lib/types";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -29,8 +31,8 @@ export default async function PaperReadPage({ params }: Props) {
   const adminUser = await isAdmin();
   if (!paper.published && !adminUser) notFound();
 
-  const allowed = await canReadPaper(paper as Paper, user.email);
-  if (!allowed) redirect(`/papers/${slug}?access=none`);
+  const access = await openReaderAccess(paper as Paper, user.email, user.id);
+  if (access === "none") redirect(`/papers/${slug}?access=none`);
 
   const [grant, billing] = await Promise.all([getActiveGrant(user.email), getBillingSettings()]);
   const watermark = formatLicenseWatermark({
@@ -49,7 +51,17 @@ export default async function PaperReadPage({ params }: Props) {
           Paper details
         </Link>
       </div>
-      <PdfViewer slug={paper.slug} title={paper.title} watermark={watermark} />
+      {access === "limited" ? (
+        <DocumentLimitScreen email={user.email} />
+      ) : (
+        <PdfViewer
+          slug={paper.slug}
+          title={paper.title}
+          watermark={watermark}
+          email={user.email}
+          previewPageLimit={access === "preview" ? FREE_PAGE_LIMIT : undefined}
+        />
+      )}
     </div>
   );
 }

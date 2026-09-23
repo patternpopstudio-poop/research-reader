@@ -1,4 +1,4 @@
-import { fulfillCheckoutSession } from "@/lib/grants";
+import { endSubscription, fulfillCheckoutSession, renewSubscriptionInvoice } from "@/lib/grants";
 import { getStripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
@@ -35,6 +35,14 @@ export async function POST(request: Request) {
 
     if (event.type === "checkout.session.async_payment_succeeded") {
       await fulfillCheckoutSession(event.data.object as Stripe.Checkout.Session);
+    }
+
+    if (event.type === "invoice.paid") {
+      await renewSubscriptionInvoice(event.data.object as Stripe.Invoice);
+    }
+
+    if (event.type === "customer.subscription.deleted") {
+      await endSubscription(event.data.object as Stripe.Subscription);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Fulfillment failed.";

@@ -323,6 +323,9 @@ export function BillingForm({ settings }: { settings: BillingSettings | null }) 
 
   return (
     <form action={action} className="flex flex-col gap-3">
+      <p className="text-sm leading-6 text-[var(--ink-muted)]">
+        The public plan is $7.99 per month. Checkout charges that subscription.
+      </p>
       <label className="text-sm text-[var(--ink-muted)]">
         Price (major units, e.g. rupees)
         <input

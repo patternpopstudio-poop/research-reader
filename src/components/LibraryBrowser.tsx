@@ -18,6 +18,7 @@ export type LibraryCard = {
   pages: number | null;
   isNew: boolean;
   readable: boolean;
+  preview?: boolean;
   href: string;
 };
 
@@ -306,14 +307,17 @@ export function LibraryBrowser({
           </div>
         ) : source.length === 0 && section === "library" ? (
           <div className="mt-8">
-            <p className="text-sm text-red-800">
-              No active access found for {email}. Purchase access to read this research and future papers from the
-              practice.
+            <p className="text-sm text-[var(--ink-muted)]">
+              Free access includes the first 2 pages of 3 documents for {email}. Open a document below, or subscribe
+              for the full library.
             </p>
+            <Link href="/plans" className="mt-3 inline-flex text-sm text-[var(--green)] hover:underline">
+              View plans
+            </Link>
             <ul className="mt-4 flex flex-col gap-2 text-sm">
               {CLINIC_PAPER_LINKS.map((paper) => (
                 <li key={paper.slug}>
-                  <Link href={`/papers/${paper.slug}`} className="text-[var(--green)] hover:underline">
+                  <Link href={`/papers/${paper.slug}/read`} className="text-[var(--green)] hover:underline">
                     {paper.title}
                   </Link>
                 </li>
@@ -413,7 +417,9 @@ export function LibraryBrowser({
                               {paper.published}
                             </span>
                           ) : null}
-                          {!paper.readable ? <span className="text-[var(--green)]">Get access</span> : null}
+                          {!paper.readable ? (
+                            <span className="text-[var(--green)]">{paper.preview ? "Free preview" : "Get access"}</span>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => toggleFavourite(paper.slug)}

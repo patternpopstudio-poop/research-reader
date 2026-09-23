@@ -151,18 +151,88 @@ async function deliverPurchaseEmails(session: Stripe.Checkout.Session, email: st
   const billing = await getBillingSettings();
   const paper = slug ? await getPaperBySlug(slug) : null;
   const name = session.customer_details?.name?.trim() || null;
+  const periodLabel =
+    session.metadata?.billing_interval === "month" ? "1 month of library access" : formatAccessPeriod(billing);
 
   await sendPurchaseConfirmation({
     to: email,
     name,
     documentTitle: paper?.title || "Research library",
-    periodLabel: formatAccessPeriod(billing),
+    periodLabel,
     expiresAt,
     amountLabel: formatCheckoutAmount(session.amount_total, session.currency),
     supportEmail: billing?.support_email ?? null,
     companyName: billing?.company_name || "Dr. Prathiba Reddy",
     accessPath,
   });
+}
+
+export async function renewSubscriptionInvoice(invoice: Stripe.Invoice) {
+  if (invoice.billing_reason !== "subscription_cycle" || invoice.status !== "paid") return;
+
+  const stripe = getStripe();
+  if (!stripe) return;
+
+  const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+  const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
+  if (!subscriptionId) return;
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const periodEnd = subscriptionPeriodEnd(subscription);
+  if (!periodEnd) return;
+
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : (invoice.customer?.id ?? null);
+  let email = normalizeEmail(invoice.customer_email || "");
+  if (!email.includes("@") && customerId) {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("access_grants")
+      .select("email")
+      .eq("source", "purchase")
+      .eq("stripe_customer_id", customerId)
+      .maybeSingle();
+    email = normalizeEmail(String(data?.email || ""));
+  }
+  if (!email.includes("@")) return;
+
+  await extendPurchaseGrant(email, customerId, periodEnd.toISOString());
+}
+
+export async function endSubscription(subscription: Stripe.Subscription) {
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+  if (!customerId) return;
+
+  const endedAt = subscription.ended_at
+    ? new Date(subscription.ended_at * 1000).toISOString()
+    : new Date().toISOString();
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("access_grants")
+    .update({ expires_at: endedAt })
+    .eq("source", "purchase")
+    .eq("stripe_customer_id", customerId);
+  if (error) throw new Error(error.message);
+}
+
+async function extendPurchaseGrant(email: string, customerId: string | null, expiresAt: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("access_grants")
+    .select("id, expires_at")
+    .eq("source", "purchase")
+    .ilike("email", email)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return;
+
+  const { error: updateError } = await admin
+    .from("access_grants")
+    .update({
+      expires_at: laterIso(data.expires_at, expiresAt),
+      stripe_customer_id: customerId,
+    })
+    .eq("id", data.id);
+  if (updateError) throw new Error(updateError.message);
 }
 
 export async function grantForCheckoutSession(sessionId: string) {

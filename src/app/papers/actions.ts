@@ -1,13 +1,14 @@
 "use server";
 
 import { getBillingSettings, getSessionUser, normalizeEmail } from "@/lib/access";
+import { LIBRARY_PLAN } from "@/lib/plan";
 import { getPaperBySlug } from "@/lib/papers";
 import { getSiteOrigin } from "@/lib/site";
 import { getStripe, getStripePriceId } from "@/lib/stripe";
 import { redirect } from "next/navigation";
 
 export async function startCheckout(_prev: { message: string }, formData: FormData) {
-  const slug = String(formData.get("slug") || "");
+  const slug = String(formData.get("slug") || "").trim();
   const user = await getSessionUser();
   const email = normalizeEmail(String(formData.get("email") || user?.email || ""));
 
@@ -15,8 +16,8 @@ export async function startCheckout(_prev: { message: string }, formData: FormDa
     return { message: "Enter the email that should receive access." };
   }
 
-  const paper = await getPaperBySlug(slug);
-  if (!paper?.published) {
+  const paper = slug ? await getPaperBySlug(slug) : null;
+  if (slug && !paper?.published) {
     return { message: "This research is not available for purchase." };
   }
 
@@ -27,26 +28,25 @@ export async function startCheckout(_prev: { message: string }, formData: FormDa
 
   const billing = await getBillingSettings();
   const priceId = getStripePriceId();
-  if (!priceId && (!billing || billing.price_cents <= 0)) {
-    return { message: "A price has not been set. Ask the practice for an invite for now." };
-  }
-
   const origin = getSiteOrigin();
   const company = billing?.company_name || "Dr. Prathiba Reddy";
-  const interval = billing?.billing_interval === "month" ? "month" : "year";
+  const successPath = paper
+    ? `/papers/${paper.slug}/unlocked?session_id={CHECKOUT_SESSION_ID}`
+    : "/plans/confirmed?session_id={CHECKOUT_SESSION_ID}";
+  const cancelPath = paper ? `/papers/${paper.slug}` : "/plans";
 
   let checkoutUrl: string;
   try {
     const session = await stripe.checkout.sessions.create({
-      mode: priceId ? "subscription" : "payment",
+      mode: "subscription",
       customer_email: email,
       client_reference_id: email,
-      success_url: `${origin}/papers/${paper.slug}/unlocked?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/papers/${paper.slug}`,
+      success_url: `${origin}${successPath}`,
+      cancel_url: `${origin}${cancelPath}`,
       metadata: {
         email,
-        paper_slug: paper.slug,
-        billing_interval: interval,
+        paper_slug: paper?.slug ?? "",
+        billing_interval: LIBRARY_PLAN.interval,
       },
       line_items: priceId
         ? [{ price: priceId, quantity: 1 }]
@@ -54,11 +54,14 @@ export async function startCheckout(_prev: { message: string }, formData: FormDa
             {
               quantity: 1,
               price_data: {
-                currency: (billing?.currency || "INR").toLowerCase(),
-                unit_amount: billing!.price_cents,
+                currency: LIBRARY_PLAN.currency,
+                unit_amount: LIBRARY_PLAN.amountCents,
+                recurring: { interval: LIBRARY_PLAN.interval },
                 product_data: {
-                  name: "Research library access",
-                  description: `Includes ${paper.title} and future research from ${company}`,
+                  name: LIBRARY_PLAN.name,
+                  description: paper
+                    ? `${LIBRARY_PLAN.checkoutDescription} Includes ${paper.title} from ${company}.`
+                    : LIBRARY_PLAN.checkoutDescription,
                 },
               },
             },

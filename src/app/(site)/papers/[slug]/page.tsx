@@ -3,10 +3,9 @@ import { PdfCover } from "@/components/PdfCover";
 import { PurchaseAccessForm } from "@/components/PurchaseAccessForm";
 import { canReadPaper, getBillingSettings, getSessionUser, isAdmin } from "@/lib/access";
 import { formatPublishedMonth, getPaperPresentation, paperTopic } from "@/lib/paper-presentation";
+import { LIBRARY_PLAN } from "@/lib/plan";
 import {
   DEFAULT_CONTENTS,
-  formatAccessPeriod,
-  formatPrice,
   getPaperBySlug,
   publicCoverUrl,
 } from "@/lib/papers";
@@ -43,8 +42,6 @@ export default async function PaperPortalPage({ params, searchParams }: Props) {
   const user = await getSessionUser();
   const allowed = user?.email ? await canReadPaper(paper as Paper, user.email) : false;
   const billing = await getBillingSettings();
-  const price = formatPrice(billing);
-  const period = formatAccessPeriod(billing);
   const cover = publicCoverUrl(paper.cover_path);
   const contents = (paper.contents ?? []).filter(Boolean);
   const checklist = [...(contents.length > 0 ? contents : DEFAULT_CONTENTS), ...(paper.highlights ?? [])];
@@ -124,10 +121,19 @@ export default async function PaperPortalPage({ params, searchParams }: Props) {
               <h2 className="mt-2 font-serif text-3xl leading-tight text-[var(--ink)]">
                 Get access to this research
               </h2>
+              {user ? (
+                <Link
+                  href={readHref}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--green)] px-5 py-3 text-sm font-medium text-[var(--green)] transition hover:bg-[var(--green)] hover:text-white"
+                >
+                  Read free preview
+                  <span aria-hidden="true">→</span>
+                </Link>
+              ) : null}
               {denied ? (
                 <p className="mt-3 text-sm leading-6 text-red-800">
-                  No active access found{user?.email ? ` for ${user.email}` : ""}. Purchase access to read
-                  this research and future papers from the practice.
+                  No active subscription found{user?.email ? ` for ${user.email}` : ""}. Free access includes the
+                  first 2 pages of 3 documents.
                 </p>
               ) : (
                 <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
@@ -168,16 +174,22 @@ export default async function PaperPortalPage({ params, searchParams }: Props) {
                     <p className="text-sm font-medium text-[var(--ink)]">Get access to this research</p>
                     <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
                       {billing?.included_copy ||
-                        "Purchase access to read this research document and future research from the practice."}
+                        "The monthly library subscription includes this document and future research from the practice."}
                     </p>
                   </div>
                 </div>
-                {price ? (
-                  <p className="mt-4 font-serif text-4xl text-[var(--ink)]">{price}</p>
-                ) : (
-                  <p className="mt-4 text-sm font-medium text-[var(--ink)]">Price set by the practice</p>
-                )}
-                <p className="mt-1 text-sm text-[var(--ink-muted)]">{period}</p>
+                <p className="mt-4 font-serif text-4xl text-[var(--ink)]">
+                  {LIBRARY_PLAN.priceLabel}
+                  <span className="ml-2 font-sans text-base font-medium text-[var(--ink-muted)]">
+                    {LIBRARY_PLAN.cadenceLabel}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                  Billed monthly.{" "}
+                  <Link href="/plans" className="text-[var(--green)] hover:underline">
+                    See what the subscription includes
+                  </Link>
+                </p>
                 <ul className="mt-4 space-y-2">
                   {checklist.map((item) => (
                     <li key={item} className="flex items-start gap-2 text-sm leading-6 text-[var(--ink-muted)]">

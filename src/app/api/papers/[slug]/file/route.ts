@@ -1,4 +1,5 @@
 import { canReadPaper, getSessionUser } from "@/lib/access";
+import { freePreviewIsOpen } from "@/lib/free-access";
 import { PAPER_SELECT } from "@/lib/papers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Paper } from "@/lib/types";
@@ -32,7 +33,8 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   const allowed = await canReadPaper(paper as Paper, user.email);
-  if (!allowed) {
+  const preview = !allowed && paper.published && (await freePreviewIsOpen(user.id, slug));
+  if (!allowed && !preview) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

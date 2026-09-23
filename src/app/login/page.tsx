@@ -1,8 +1,8 @@
 import { LibraryStory } from "@/components/LibraryStory";
 import { LoginForm } from "@/components/LoginForm";
 import { SiteMark } from "@/components/SiteMark";
-import { CLINIC_PAPER_LINKS } from "@/lib/clinic-papers";
 import { getActiveGrant, getSessionUser, isAdmin, listAccessiblePapers } from "@/lib/access";
+import { LIBRARY_PLAN } from "@/lib/plan";
 import { isSupabaseConfigured, missingSupabaseEnvNames } from "@/lib/supabase/env.server";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -14,8 +14,6 @@ type Props = {
 export default async function LoginPage({ searchParams }: Props) {
   const params = await searchParams;
   const nextPath = params.next?.startsWith("/") ? params.next : "/";
-  const portalMatch = nextPath.match(/^\/papers\/([^/]+)\/read\/?$/);
-  const accessHref = portalMatch ? `/papers/${portalMatch[1]}` : "/papers/understanding-vertigo";
   const user = await getSessionUser();
 
   let panel: ReactNode;
@@ -44,25 +42,13 @@ export default async function LoginPage({ searchParams }: Props) {
           No active access found for {user.email}. Purchase access to read this research and future papers
           from the practice.
         </p>
-        {portalMatch ? (
-          <Link
-            href={accessHref}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--green)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--green-dark)]"
-          >
-            Purchase access
-            <span aria-hidden="true">→</span>
-          </Link>
-        ) : (
-          <ul className="mt-6 flex flex-col gap-2 text-sm">
-            {CLINIC_PAPER_LINKS.map((paper) => (
-              <li key={paper.slug}>
-                <Link href={`/papers/${paper.slug}`} className="text-[var(--green)] hover:underline">
-                  {paper.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <Link
+          href="/plans"
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--green)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--green-dark)]"
+        >
+          View the {LIBRARY_PLAN.priceLabel} monthly plan
+          <span aria-hidden="true">→</span>
+        </Link>
       </>
     );
   } else {
@@ -102,7 +88,7 @@ export default async function LoginPage({ searchParams }: Props) {
               </p>
               <h2 className="mt-2 font-serif text-2xl text-[var(--ink)]">Get access to our research library</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-                Purchase access to read research documents, clinical guides, and future releases.
+                One plan: {LIBRARY_PLAN.priceLabel} per month for the research library, including documents published while you are subscribed.
               </p>
             </div>
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--green)_12%,var(--paper))] text-[var(--green)]">
@@ -110,7 +96,7 @@ export default async function LoginPage({ searchParams }: Props) {
             </span>
           </div>
           <Link
-            href={accessHref}
+            href="/plans"
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--green)] px-5 py-3 text-sm font-medium text-[var(--green)] transition hover:bg-[var(--green)] hover:text-white"
           >
             View access plans

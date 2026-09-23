@@ -21,7 +21,7 @@ export async function ResearchLibrary({
   const catalog = await listPublishedPapers();
   const readable = email ? await listAccessiblePapers() : [];
   const readableSlugs = new Set(readable.map((paper) => paper.slug));
-  const cards = catalog.map((paper) => toCard(paper, readableSlugs));
+  const cards = catalog.map((paper) => toCard(paper, readableSlugs, Boolean(email)));
   const newest = cards.reduce((latest, card) => Math.max(latest, card.sortAt), 0);
   const newestIndex = cards.findIndex((card) => newest > 0 && card.sortAt === newest);
   const withNew = cards.map((card, index) => ({ ...card, isNew: index === newestIndex }));
@@ -40,9 +40,10 @@ export async function ResearchLibrary({
   );
 }
 
-function toCard(paper: Paper, readableSlugs: Set<string>): LibraryCard {
+function toCard(paper: Paper, readableSlugs: Set<string>, signedIn: boolean): LibraryCard {
   const presentation = getPaperPresentation(paper.slug);
   const readable = readableSlugs.has(paper.slug);
+  const preview = signedIn && !readable;
   const sortAt = presentationSortTime(paper.slug, paper.created_at);
   return {
     id: paper.id,
@@ -56,6 +57,7 @@ function toCard(paper: Paper, readableSlugs: Set<string>): LibraryCard {
     pages: presentation?.pages ?? null,
     isNew: false,
     readable,
-    href: readable ? `/papers/${paper.slug}/read` : `/papers/${paper.slug}`,
+    preview,
+    href: readable || preview ? `/papers/${paper.slug}/read` : `/papers/${paper.slug}`,
   };
 }

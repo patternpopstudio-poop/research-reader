@@ -7,17 +7,19 @@ export function PurchaseAccessForm({
   slug,
   email,
   variant = "default",
+  submitLabel = "Purchase & Unlock Access",
 }: {
-  slug: string;
+  slug?: string;
   email?: string;
   variant?: "default" | "access";
+  submitLabel?: string;
 }) {
   const [state, action, pending] = useActionState(startCheckout, { message: "" });
   const access = variant === "access";
 
   return (
     <form action={action} className={access ? "flex flex-col gap-3" : "mt-6 flex flex-col gap-3"}>
-      <input type="hidden" name="slug" value={slug} />
+      {slug ? <input type="hidden" name="slug" value={slug} /> : null}
       {email ? (
         <input type="hidden" name="email" value={email} />
       ) : (
@@ -42,7 +44,7 @@ export function PurchaseAccessForm({
             : "rounded-full bg-[var(--green)] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--green-dark)] disabled:opacity-60"
         }
       >
-        {pending ? "Opening checkout…" : "Purchase & Unlock Access"}
+        {pending ? "Opening checkout…" : submitLabel}
         {access && !pending ? <span aria-hidden="true">→</span> : null}
       </button>
       {email ? <p className="text-xs text-[var(--ink-muted)]">Checkout will use {email}.</p> : null}

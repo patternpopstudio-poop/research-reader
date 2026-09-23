@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { LimitReachedModal } from "@/components/LimitReachedModal";
 import { ViewerLock } from "@/components/ViewerLock";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   slug: string;
   title: string;
   watermark: string;
+  email?: string;
+  previewPageLimit?: number;
 };
 
 type PdfjsModule = typeof import("pdfjs-dist");
 type RenderTask = { cancel: () => void; promise: Promise<void> };
 
-export function PdfViewer({ slug, title, watermark }: Props) {
+export function PdfViewer({ slug, title, watermark, email, previewPageLimit }: Props) {
   const shellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<import("pdfjs-dist").PDFDocumentProxy | null>(null);
@@ -24,6 +27,7 @@ export function PdfViewer({ slug, title, watermark }: Props) {
   const [scale, setScale] = useState(1.15);
   const [hidden, setHidden] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [limitOpen, setLimitOpen] = useState(false);
 
   useEffect(() => {
     const onVis = () => setHidden(document.hidden);
@@ -46,7 +50,8 @@ export function PdfViewer({ slug, title, watermark }: Props) {
     renderTask.current?.cancel();
 
     try {
-      const pageNumber = Math.min(Math.max(page, 1), pdf.numPages);
+      const maxPage = previewPageLimit ? Math.min(pdf.numPages, previewPageLimit) : pdf.numPages;
+      const pageNumber = Math.min(Math.max(page, 1), maxPage);
       const pdfPage = await pdf.getPage(pageNumber);
       if (generation !== renderGeneration.current) return;
 
@@ -90,7 +95,7 @@ export function PdfViewer({ slug, title, watermark }: Props) {
       if (name === "RenderingCancelledException") return;
       setStatus("error");
     }
-  }, [page, scale, watermark]);
+  }, [page, previewPageLimit, scale, watermark]);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +152,16 @@ export function PdfViewer({ slug, title, watermark }: Props) {
     }
   }, [status, renderPage]);
 
+  const previewBlocked = Boolean(previewPageLimit && pageCount > previewPageLimit && page >= previewPageLimit);
+
+  const requestNext = useCallback(() => {
+    if (previewPageLimit && pageCount > previewPageLimit && page >= previewPageLimit) {
+      setLimitOpen(true);
+      return;
+    }
+    setPage((current) => Math.min(pageCount || current, current + 1));
+  }, [page, pageCount, previewPageLimit]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -163,13 +178,13 @@ export function PdfViewer({ slug, title, watermark }: Props) {
       }
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        setPage((current) => Math.min(pageCount || current, current + 1));
+        requestNext();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pageCount]);
+  }, [requestNext]);
 
   async function toggleFullscreen() {
     const shell = shellRef.current;
@@ -195,7 +210,9 @@ export function PdfViewer({ slug, title, watermark }: Props) {
       <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--cream)]/95 px-4 py-3 backdrop-blur">
         <div className="min-w-0">
           <p className="truncate font-serif text-lg text-[var(--ink)]">{title}</p>
-          <p className="text-xs text-[var(--ink-muted)]">Read only</p>
+          <p className="text-xs text-[var(--ink-muted)]">
+            {previewPageLimit ? `Free preview · first ${previewPageLimit} pages` : "Read only"}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -213,8 +230,8 @@ export function PdfViewer({ slug, title, watermark }: Props) {
           <button
             type="button"
             className="rounded-full border border-[var(--line)] px-3 py-1 text-sm disabled:opacity-40"
-            onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-            disabled={atEnd || status !== "ready"}
+            onClick={requestNext}
+            disabled={(atEnd && !previewBlocked) || status !== "ready"}
             aria-label="Next page"
           >
             Next
@@ -266,6 +283,9 @@ export function PdfViewer({ slug, title, watermark }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--cream)]">
           <p className="font-serif text-xl text-[var(--ink)]">Reading paused</p>
         </div>
+      ) : null}
+      {previewPageLimit ? (
+        <LimitReachedModal open={limitOpen} onClose={() => setLimitOpen(false)} email={email} reason="pages" />
       ) : null}
     </div>
   );
