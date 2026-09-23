@@ -1,6 +1,6 @@
 import { LoginForm } from "@/components/LoginForm";
+import { PdfCover } from "@/components/PdfCover";
 import { PurchaseAccessForm } from "@/components/PurchaseAccessForm";
-import { SiteMark } from "@/components/SiteMark";
 import { canReadPaper, getBillingSettings, getSessionUser, isAdmin } from "@/lib/access";
 import { formatPublishedMonth, getPaperPresentation, paperTopic } from "@/lib/paper-presentation";
 import {
@@ -72,10 +72,7 @@ export default async function PaperPortalPage({ params, searchParams }: Props) {
             // eslint-disable-next-line @next/next/no-img-element -- cover host is the project's Supabase URL
             <img src={cover} alt="" className="aspect-[16/10] w-full rounded-2xl object-cover" />
           ) : (
-            <div className="relative flex aspect-[16/10] items-end overflow-hidden rounded-2xl bg-[linear-gradient(160deg,#d7e3d0,var(--paper)_55%)] p-6">
-              <SiteMark className="absolute left-5 top-5 h-8 w-8 text-[var(--green)]" />
-              <p className="font-serif text-2xl text-[var(--ink)]">{paper.title}</p>
-            </div>
+            <PdfCover className="rounded-2xl" />
           )}
 
           <p className="mt-6 text-xs font-medium uppercase tracking-[0.18em] text-[var(--green)]">

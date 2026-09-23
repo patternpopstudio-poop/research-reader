@@ -4,7 +4,13 @@ import { formatPublishedMonth, getPaperPresentation, paperTopic, presentationSor
 import { publicCoverUrl } from "@/lib/papers";
 import type { Paper } from "@/lib/types";
 
-export async function ResearchLibrary() {
+export async function ResearchLibrary({
+  view = null,
+  topic = null,
+}: {
+  view?: string | null;
+  topic?: string | null;
+}) {
   let email: string | null = null;
   try {
     email = (await getSessionUser())?.email ?? null;
@@ -22,7 +28,16 @@ export async function ResearchLibrary() {
   const readableCards = withNew.filter((card) => readableSlugs.has(card.slug));
   const canUpload = Boolean(email) && (await isAdmin());
 
-  return <LibraryBrowser catalog={withNew} library={readableCards} email={email} canUpload={canUpload} />;
+  return (
+    <LibraryBrowser
+      catalog={withNew}
+      library={readableCards}
+      email={email}
+      canUpload={canUpload}
+      view={view}
+      topic={topic}
+    />
+  );
 }
 
 function toCard(paper: Paper, readableSlugs: Set<string>): LibraryCard {

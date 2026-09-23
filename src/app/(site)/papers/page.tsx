@@ -1,5 +1,10 @@
 import { ResearchLibrary } from "@/components/ResearchLibrary";
 
-export default function PapersIndexPage() {
-  return <ResearchLibrary />;
+type Props = {
+  searchParams: Promise<{ view?: string; topic?: string }>;
+};
+
+export default async function PapersIndexPage({ searchParams }: Props) {
+  const params = await searchParams;
+  return <ResearchLibrary view={params.view ?? null} topic={params.topic ?? null} />;
 }

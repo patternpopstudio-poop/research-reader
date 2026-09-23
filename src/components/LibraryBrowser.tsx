@@ -1,9 +1,10 @@
 "use client";
 
+import { PdfCover } from "@/components/PdfCover";
 import { CLINIC_PAPER_LINKS } from "@/lib/clinic-papers";
-import { PAPER_TOPIC_NAMES } from "@/lib/paper-presentation";
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
 export type LibraryCard = {
   id: string;
@@ -33,23 +34,46 @@ export function LibraryBrowser({
   library,
   email,
   canUpload = false,
+  view = null,
+  topic: topicQuery = null,
 }: {
   catalog: LibraryCard[];
   library: LibraryCard[];
   email: string | null;
   canUpload?: boolean;
+  view?: string | null;
+  topic?: string | null;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const topic = topicQuery && topicQuery.length > 0 ? topicQuery : "all";
   const [section, setSection] = useState<Section>("all");
   const [query, setQuery] = useState("");
-  const [topic, setTopic] = useState("all");
   const [sort, setSort] = useState<SortOrder>("latest");
-  const [view, setView] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
-  const [topicsOpen, setTopicsOpen] = useState(true);
+  const filterKey = `${topic}:${view ?? ""}`;
+  const [pageFilter, setPageFilter] = useState(filterKey);
+  const showingTopics = view === "topics" && topic === "all" && query.trim() === "";
   const favouritesRaw = useSyncExternalStore(subscribeFavourites, readFavouritesRaw, () => "[]");
   const favourites = useMemo(() => parseFavourites(favouritesRaw), [favouritesRaw]);
 
+  const filterKeyNow = `${topic}:${view ?? ""}`;
+  if (pageFilter !== filterKeyNow) {
+    setPageFilter(filterKeyNow);
+    setPage(1);
+  }
+
   const favouriteSet = useMemo(() => new Set(favourites), [favourites]);
+  const topicNames = useMemo(() => {
+    const names = new Set(catalog.map((paper) => paper.topic));
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [catalog]);
+  const topicCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const paper of catalog) counts.set(paper.topic, (counts.get(paper.topic) ?? 0) + 1);
+    return counts;
+  }, [catalog]);
   const source =
     section === "favourites"
       ? catalog.filter((paper) => favouriteSet.has(paper.slug))
@@ -78,15 +102,40 @@ export function LibraryBrowser({
     setPage(1);
   }
 
+  function pushParams(next: URLSearchParams) {
+    const qs = next.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
   function chooseSection(next: Section) {
     setSection(next);
     resetPage();
+    const params = new URLSearchParams();
+    if (next !== "all" && topic !== "all") params.set("topic", topic);
+    pushParams(params);
+  }
+
+  function showTopics() {
+    setSection("all");
+    setQuery("");
+    resetPage();
+    const params = new URLSearchParams();
+    params.set("view", "topics");
+    pushParams(params);
   }
 
   function chooseTopic(next: string) {
-    setTopic(next);
+    setSection("all");
     resetPage();
+    const params = new URLSearchParams();
+    if (next !== "all") params.set("topic", next);
+    pushParams(params);
   }
+
+  useEffect(() => {
+    if (!showingTopics) return;
+    document.getElementById("library-topics")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [showingTopics]);
 
   function toggleFavourite(slug: string) {
     const next = favourites.includes(slug) ? favourites.filter((item) => item !== slug) : [...favourites, slug];
@@ -98,7 +147,11 @@ export function LibraryBrowser({
     <div className="flex flex-1 flex-col lg:flex-row">
       <aside className="flex flex-col border-b border-[var(--line)] bg-white px-3 py-4 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:w-60 lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:py-5">
         <nav className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Library">
-          <SectionButton active={section === "all"} onClick={() => chooseSection("all")} icon={<GridIcon />}>
+          <SectionButton
+            active={section === "all" && !showingTopics && topic === "all"}
+            onClick={() => chooseSection("all")}
+            icon={<GridIcon />}
+          >
             All Research
           </SectionButton>
           <SectionButton active={section === "library"} onClick={() => chooseSection("library")} icon={<LibraryIcon />}>
@@ -122,29 +175,27 @@ export function LibraryBrowser({
           ) : null}
         </nav>
 
-        <div id="topics" className="mt-5">
+        <div className="mt-5">
           <button
             type="button"
-            onClick={() => setTopicsOpen((open) => !open)}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink-muted)] hover:text-[var(--ink)]"
-            aria-expanded={topicsOpen}
+            onClick={showTopics}
+            aria-current={showingTopics ? "page" : undefined}
+            className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm ${
+              showingTopics
+                ? "bg-[#f0f5e4] font-medium text-[var(--ink)]"
+                : "text-[var(--ink-muted)] hover:bg-[#f7faf2] hover:text-[var(--ink)]"
+            }`}
           >
             <LayersIcon />
             <span className="flex-1">Topics</span>
-            <ChevronIcon open={topicsOpen} />
           </button>
-          {topicsOpen ? (
-            <div className="mt-1 flex flex-wrap gap-1 pl-8 lg:flex-col">
-              <TopicButton active={topic === "all"} onClick={() => chooseTopic("all")}>
-                All topics
+          <div className="mt-1 flex flex-wrap gap-1 pl-8 lg:flex-col">
+            {topicNames.map((name) => (
+              <TopicButton key={name} active={!showingTopics && topic === name} onClick={() => chooseTopic(name)}>
+                {name}
               </TopicButton>
-              {PAPER_TOPIC_NAMES.map((name) => (
-                <TopicButton key={name} active={topic === name} onClick={() => chooseTopic(name)}>
-                  {name}
-                </TopicButton>
-              ))}
-            </div>
-          ) : null}
+            ))}
+          </div>
         </div>
 
         <a
@@ -212,7 +263,7 @@ export function LibraryBrowser({
               className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)] outline-none ring-[var(--green)] focus:ring-2 lg:w-40"
             >
               <option value="all">All Topics</option>
-              {PAPER_TOPIC_NAMES.map((name) => (
+              {topicNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
@@ -234,10 +285,10 @@ export function LibraryBrowser({
             </select>
           </label>
           <div className="flex shrink-0 overflow-hidden rounded-xl border border-[var(--line)] bg-white">
-            <ViewButton active={view === "grid"} label="Grid view" onClick={() => setView("grid")}>
+            <ViewButton active={viewMode === "grid"} label="Grid view" onClick={() => setViewMode("grid")}>
               <GridIcon />
             </ViewButton>
-            <ViewButton active={view === "list"} label="List view" onClick={() => setView("list")}>
+            <ViewButton active={viewMode === "list"} label="List view" onClick={() => setViewMode("list")}>
               <RowsIcon />
             </ViewButton>
           </div>
@@ -275,11 +326,48 @@ export function LibraryBrowser({
           </p>
         ) : source.length === 0 && section === "all" ? (
           <p className="mt-8 text-sm text-[var(--ink-muted)]">No research has been published yet.</p>
+        ) : showingTopics ? (
+          <section id="library-topics" className="mt-6 scroll-mt-24">
+            <h2 className="text-lg font-semibold text-[var(--ink)]">Topics</h2>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">Choose a topic to see the research in it.</p>
+            <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {topicNames.map((name) => {
+                const count = topicCounts.get(name) ?? 0;
+                return (
+                  <li key={name}>
+                    <button
+                      type="button"
+                      onClick={() => chooseTopic(name)}
+                      className="flex h-full w-full flex-col rounded-2xl border border-[var(--line)] bg-white p-5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[color-mix(in_srgb,var(--green)_45%,var(--line))]"
+                    >
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--green)]">
+                        Topic
+                      </span>
+                      <span className="mt-2 text-lg font-semibold text-[var(--ink)]">{name}</span>
+                      <span className="mt-1 text-sm text-[var(--ink-muted)]">
+                        {count} research {count === 1 ? "document" : "documents"}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         ) : (
           <>
-            <p className="mt-5 text-sm font-medium text-[var(--ink)]">
-              {visible.length} research {visible.length === 1 ? "document" : "documents"}
-            </p>
+            <div className="mt-5 flex items-baseline justify-between gap-3">
+              <p className="text-sm font-medium text-[var(--ink)]">
+                {topic !== "all" ? (
+                  <span className="mr-2 text-base font-semibold">{topic}</span>
+                ) : null}
+                {visible.length} research {visible.length === 1 ? "document" : "documents"}
+              </p>
+              {topic !== "all" ? (
+                <button type="button" onClick={showTopics} className="text-sm text-[var(--green)] hover:underline">
+                  All topics
+                </button>
+              ) : null}
+            </div>
             {visible.length === 0 ? (
               <p className="mt-6 text-sm text-[var(--ink-muted)]">
                 {section === "favourites" ? "No saved research matches that filter." : "No research matches that filter."}
@@ -287,7 +375,7 @@ export function LibraryBrowser({
             ) : (
               <ul
                 className={
-                  view === "grid"
+                  viewMode === "grid"
                     ? "mt-4 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(15.5rem,1fr))]"
                     : "mt-4 flex flex-col gap-3"
                 }
@@ -296,10 +384,10 @@ export function LibraryBrowser({
                   <li key={paper.id}>
                     <article
                       className={`overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[color-mix(in_srgb,var(--green)_45%,var(--line))] ${
-                        view === "list" ? "flex" : "flex h-full flex-col"
+                        viewMode === "list" ? "flex" : "flex h-full flex-col"
                       }`}
                     >
-                      <Link href={paper.href} className={view === "list" ? "w-40 shrink-0 sm:w-52" : "block"}>
+                      <Link href={paper.href} className={viewMode === "list" ? "w-40 shrink-0 sm:w-52" : "block"}>
                         <Cover paper={paper} />
                       </Link>
                       <div className="flex min-w-0 flex-1 flex-col p-4">
@@ -354,20 +442,6 @@ export function LibraryBrowser({
   );
 }
 
-function coverTone(topic: string) {
-  const tones: Record<string, string> = {
-    Allergies: "bg-[linear-gradient(145deg,#f6ead8,#f8f4ee_42%,#e4efc8)]",
-    Vertigo: "bg-[linear-gradient(160deg,#e4ead4,#f7f8f2_48%,#c9d4a8)]",
-    "Ear health": "bg-[linear-gradient(165deg,#49630b,#8fb837_70%,#f0f5e4)]",
-    Respiratory: "bg-[linear-gradient(180deg,#e7f0c8,#a3c44a)]",
-    "Children's health": "bg-[linear-gradient(180deg,#f0f5e4,#8fb837)]",
-    Sleep: "bg-[linear-gradient(160deg,#e7e5e4,#d6d3d1)]",
-    Voice: "bg-[linear-gradient(160deg,#fde68a,#fff7ed)]",
-    Research: "bg-[linear-gradient(160deg,#e7f0c8,#f7faf2_55%,#c5d98a)]",
-  };
-  return tones[topic] ?? "bg-[linear-gradient(160deg,#e4efc8,#f7faf2_58%)]";
-}
-
 function Cover({ paper }: { paper: LibraryCard }) {
   return (
     <div className="relative">
@@ -375,10 +449,7 @@ function Cover({ paper }: { paper: LibraryCard }) {
         // eslint-disable-next-line @next/next/no-img-element -- cover host is the project's Supabase URL
         <img src={paper.coverUrl} alt="" className="aspect-[16/10] w-full object-cover" />
       ) : (
-        <div className={`relative aspect-[16/10] w-full overflow-hidden ${coverTone(paper.topic)}`}>
-          <span className="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/40" />
-          <span className="absolute -bottom-8 left-6 h-20 w-28 rounded-full bg-white/25" />
-        </div>
+        <PdfCover />
       )}
       {paper.isNew ? (
         <span className="absolute left-3 top-3 rounded-full bg-[var(--green)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
@@ -610,21 +681,6 @@ function HeroArt() {
         strokeLinecap="round"
         opacity="0.9"
       />
-    </svg>
-  );
-}
-
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path d="M5 7.5 10 12.5 15 7.5" />
     </svg>
   );
 }
