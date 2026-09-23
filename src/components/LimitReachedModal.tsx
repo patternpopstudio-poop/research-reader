@@ -1,7 +1,7 @@
 "use client";
 
 import { PurchaseAccessForm } from "@/components/PurchaseAccessForm";
-import { FREE_DOCUMENT_LIMIT, FREE_PAGE_LIMIT } from "@/lib/free-access";
+import { FREE_DOCUMENT_LIMIT, FREE_PAGE_LIMIT } from "@/lib/free-preview";
 import { LIBRARY_PLAN } from "@/lib/plan";
 import Link from "next/link";
 import { useState } from "react";

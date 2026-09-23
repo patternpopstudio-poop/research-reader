@@ -1,9 +1,9 @@
 import { emailHasAccess, isAdmin } from "@/lib/access";
+import { FREE_DOCUMENT_LIMIT, FREE_PAGE_LIMIT } from "@/lib/free-preview";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import type { Paper } from "@/lib/types";
 
-export const FREE_PAGE_LIMIT = 2;
-export const FREE_DOCUMENT_LIMIT = 3;
+export { FREE_DOCUMENT_LIMIT, FREE_PAGE_LIMIT };
 
 export type ReaderAccess = "full" | "preview" | "limited" | "none";
 
